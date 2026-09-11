@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FDE Meeting Review</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">F</span>
+        <div><strong>FDE</strong><small>Meeting Review</small></div>
+      </div>
+      <button class="primary wide" id="new-run">+ New review</button>
+      <div class="sidebar-label">Recent reviews</div>
+      <nav id="run-list" aria-label="Saved reviews"></nav>
+      <div class="local-card">
+        <span class="pulse"></span>
+        <div><strong>Local workspace</strong><small>Offline portfolio demo. Fictional scenarios; no external calls.</small></div>
+      </div>
+    </aside>
+
+    <main>
+      <header>
+        <div>
+          <span class="eyebrow">CONTROLLED WORKFLOW</span>
+          <h1 id="page-title">Meeting to project plan</h1>
+        </div>
+        <div class="header-status" id="model-status">Loading…</div>
+      </header>
+
+      <section id="welcome" class="welcome">
+        <div class="hero">
+          <span class="hero-kicker">Evidence before action</span>
+          <h2>Turn a transcript into an approved, traceable project plan.</h2>
+          <p>Extract commitments, verify every source quotation, resolve blockers, and record one explicit human decision. All results are saved locally.</p>
+          <button class="primary" id="hero-new">Start a review</button>
+        </div>
+        <div class="flow-card">
+          <div class="flow-step"><b>01</b><span><strong>Intake</strong><small>Transcript and approved context</small></span></div>
+          <div class="flow-line"></div>
+          <div class="flow-step"><b>02</b><span><strong>Evidence review</strong><small>Commitments, exclusions, conflicts</small></span></div>
+          <div class="flow-line"></div>
+          <div class="flow-step"><b>03</b><span><strong>Human decision</strong><small>Approve, reject, or clarify</small></span></div>
+          <div class="flow-line"></div>
+          <div class="flow-step"><b>04</b><span><strong>Local plan</strong><small>Portable JSON and Markdown</small></span></div>
+        </div>
+      </section>
+
+      <section id="intake" class="panel hidden">
+        <div class="panel-heading">
+          <div><span class="eyebrow">NEW REVIEW</span><h2>Choose an input</h2></div>
+          <button class="icon-button" id="close-intake" aria-label="Close">×</button>
+        </div>
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="fixtures">Saved test scenarios</button>
+          <span>Live extraction excluded from this demo</span>
+        </div>
+        <form id="fixture-form" class="tab-panel">
+          <div id="fixture-options" class="fixture-grid"></div>
+          <button class="primary" type="submit">Build offline review</button>
+        </form>
+        <form id="manual-form" class="tab-panel hidden">
+          <div class="form-grid">
+            <label class="span-2">Meeting title<input name="title" maxlength="200" required placeholder="Weekly delivery review"></label>
+            <label>Meeting start<input name="started_at" required placeholder="2026-09-11T10:00:00+02:00"></label>
+            <label>Reviewer<input name="reviewer" required value="Felipe"></label>
+            <label>Client<input name="client" required placeholder="Client name"></label>
+            <label>Approved project<input name="project" required placeholder="Project name"></label>
+            <label class="span-2">Project aliases<input name="aliases" placeholder="One per line or comma separated"></label>
+            <label class="span-2">Approved owners<textarea name="owners" rows="3" required placeholder="One owner per line"></textarea></label>
+            <label class="span-2">Approved project facts<textarea name="approved_facts" rows="3" placeholder="Context the extractor may use"></textarea></label>
+            <label class="span-2">Transcript<textarea name="transcript" rows="11" maxlength="40000" required placeholder="One spoken turn per line, including the speaker name"></textarea></label>
+          </div>
+          <div class="consent-box">
+            <strong>External model call</strong>
+            <p>The manual path sends this transcript and approved context through the local OpenClaw Codex runtime to OpenAI using your ChatGPT subscription.</p>
+            <label class="check"><input type="checkbox" name="processingPermission"> I confirm this transcript may be sent for extraction.</label>
+            <label class="check"><input type="checkbox" name="usagePermission"> I approve use of my ChatGPT subscription allowance for this model call.</label>
+          </div>
+          <div id="run-status" class="notice muted hidden" role="status" aria-live="polite"></div>
+          <button class="primary" type="submit">Extract and build review</button>
+        </form>
+      </section>
+
+      <section id="review" class="hidden"></section>
+      <div id="toast" role="status" aria-live="polite"></div>
+    </main>
+  </div>
+  <script src="/consent.js" defer></script>
+  <script src="/app.js" defer></script>
+</body>
+</html>

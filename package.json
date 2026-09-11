@@ -1,0 +1,13 @@
+{
+  "name": "fde-meeting-review",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local meeting transcript review and approval app",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.cjs"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

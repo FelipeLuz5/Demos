@@ -1,0 +1,13 @@
+data/
+node_modules/
+.env
+.env.*
+*.sqlite*
+*.db
+*.log
+*.key
+*.pem
+.DS_Store
+Thumbs.db
+openclaw-extractor.json5
+openclaw-extractor-workspace/
