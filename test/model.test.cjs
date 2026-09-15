@@ -4,21 +4,18 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { normalizeInput } = require('../src/core');
 const { baseConfig, fixtures } = require('../src/fixtures');
-const { DEFAULT_OPENCLAW_MODEL, buildOpenClawPrompt, openClawArguments, extractWithOpenClaw } = require('../src/model');
+const { DEFAULT_OPENCLAW_MODEL, DEFAULT_OPENCLAW_THINKING, DEFAULT_OPENCLAW_AGENT, buildOpenClawPrompt, openClawArguments, cleanupArguments, extractWithOpenClaw } = require('../src/model');
 
 function source() {
   return normalizeInput(fixtures.pt05.source, { ...baseConfig, model: DEFAULT_OPENCLAW_MODEL });
 }
 
 const envelope = extraction => JSON.stringify({
-  ok: true,
   status: 'ok',
-  final: JSON.stringify(extraction),
-  model: 'gpt-5.4-mini',
-  provider: 'openai'
+  result: { payloads: [{ text: JSON.stringify(extraction) }] }
 });
 
-test('OpenClaw adapter uses a tool-denied one-shot Codex route with thinking off', async () => {
+test('OpenClaw adapter uses a tool-denied one-shot Codex route with low thinking', async () => {
   let call;
   const extraction = await extractWithOpenClaw(source(), {
     runner: async options => {
@@ -35,21 +32,20 @@ test('OpenClaw adapter uses a tool-denied one-shot Codex route with thinking off
   assert.match(call.prompt, /INPUT_JSON:/);
   assert.match(call.prompt, /I will send the creative brief/);
 
-  const args = openClawArguments();
+  const args = openClawArguments({ sessionKey: 'test-session', messageFile: 'C:\\temp\\prompt.txt' });
   assert.deepEqual(args.slice(0, 6), ['-d', 'Ubuntu', '-u', 'ubuntu', '--', '/usr/local/bin/openclaw']);
   assert.ok(args.includes('agent'));
-  assert.ok(args.includes('exec'));
-  assert.equal(args[args.indexOf('--model') + 1], DEFAULT_OPENCLAW_MODEL);
-  assert.equal(args[args.indexOf('--thinking') + 1], 'off');
+  assert.equal(args[args.indexOf('--agent') + 1], DEFAULT_OPENCLAW_AGENT);
+  assert.equal(args[args.indexOf('--session-key') + 1], 'test-session');
+  assert.equal(args[args.indexOf('--thinking') + 1], DEFAULT_OPENCLAW_THINKING);
   assert.equal(args[args.indexOf('--timeout') + 1], '60');
-  assert.equal(args[args.indexOf('--code-mode') + 1], 'direct');
-  assert.equal(args[args.indexOf('--message-file') + 1], '-');
-  assert.match(args[args.indexOf('--config') + 1], /openclaw-extractor\.json5$/);
+  assert.equal(args[args.indexOf('--message-file') + 1], '/mnt/c/temp/prompt.txt');
+  assert.deepEqual(cleanupArguments('test-session').slice(6, 10), ['sessions', 'delete', `agent:${DEFAULT_OPENCLAW_AGENT}:test-session`, '--agent']);
 });
 
 test('OpenClaw adapter rejects malformed or locally invalid output', async () => {
   await assert.rejects(
-    extractWithOpenClaw(source(), { runner: async () => JSON.stringify({ ok: true, status: 'ok', final: 'not json' }) }),
+    extractWithOpenClaw(source(), { runner: async () => JSON.stringify({ status: 'ok', result: { payloads: [{ text: 'not json' }] } }) }),
     /final response was not valid JSON/
   );
   await assert.rejects(
@@ -60,7 +56,7 @@ test('OpenClaw adapter rejects malformed or locally invalid output', async () =>
 
 test('OpenClaw adapter surfaces execution failures without requiring an API key', async () => {
   await assert.rejects(
-    extractWithOpenClaw(source(), { runner: async () => JSON.stringify({ ok: false, status: 'timeout', error: { message: 'deadline exceeded' } }) }),
+    extractWithOpenClaw(source(), { runner: async () => JSON.stringify({ status: 'timeout', error: { message: 'deadline exceeded' } }) }),
     /deadline exceeded/
   );
 });

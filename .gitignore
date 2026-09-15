@@ -3,11 +3,12 @@ node_modules/
 .env
 .env.*
 *.sqlite*
-*.db
+*.db*
+*.dpapi
 *.log
-*.key
 *.pem
+*.key
+client_secret*.json
+credentials*.json
 .DS_Store
 Thumbs.db
-openclaw-extractor.json5
-openclaw-extractor-workspace/

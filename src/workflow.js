@@ -26,7 +26,7 @@ function manualConfig(input) {
   return {
     reviewer_name: String(input.reviewer || '').trim(),
     approval_hours: 24,
-    model: process.env.FDE_OPENCLAW_MODEL || DEFAULT_OPENCLAW_MODEL,
+    model: DEFAULT_OPENCLAW_MODEL,
     owners,
     projects: [{ client, name: project, aliases: [...new Set([project, ...aliases])], approved_facts: String(input.approved_facts || '').trim() }]
   };
@@ -40,6 +40,7 @@ function newRunRecord(source, extraction, review) {
 }
 
 function applyDecision(review, input, now = Date.now()) {
+  if (input.decision === 'Review tasks') return require('./task-review').reviewTasks(review, input, now);
   if (!['Approve', 'Reject', 'Request clarification'].includes(input.decision)) throw new Error('Invalid decision');
   const decision = decide(review, input, now);
   let status;
@@ -54,6 +55,24 @@ function applyDecision(review, input, now = Date.now()) {
 }
 
 function artifactMarkdown(record) {
+  if (record.review.kind === 'client_briefs') {
+    const proposals = record.artifact?.projects || record.review.proposals;
+    const lines = [`# ${record.title}`, '', `Status: ${record.status}`, '', 'Project proposals are not external client commitments.', ''];
+    for (const p of proposals) {
+      lines.push(`## ${p.name}`, '', `Client: ${p.client || 'Unspecified'}`, `Delivery date: ${p.delivery_date || 'Unspecified'}`, '', p.description, '', 'Deliverables:', ...p.deliverables.map(d => `- ${d.text}`), '', 'Requirements:', ...p.requirements.map(r => `- ${r.text}`), '', 'Evidence:', ...p.evidence.map(e => `- Line ${e.line}: ${e.quote}`), '');
+    }
+    const google = record.artifact?.google_delivery;
+    if (google) {
+      lines.push('## Google delivery', '', `Status: ${google.status}`, '');
+      for (const project of google.projects || []) {
+        lines.push(`- ${project.project}`, `  - Drive folder: ${project.folder_url || 'Not created'}`, `  - Google Doc: ${project.document_url || 'Not created'}`, `  - Calendar: ${project.calendar_url || project.calendar_status}`, '');
+      }
+      if (google.error) lines.push(`Delivery issue: ${google.error}`, '');
+    }
+    if (record.artifact?.delivery?.destination === 'notion') lines.push(`Historical Notion delivery: ${record.artifact.delivery.status}`, '');
+    lines.push(`External writes performed: ${record.artifact?.external_writes_performed === null ? 'uncertain' : Boolean(record.artifact?.external_writes_performed)}`);
+    return lines.join('\n');
+  }
   const artifact = record.artifact;
   const review = record.review;
   const decision = record.decision?.approval;
@@ -68,6 +87,8 @@ function artifactMarkdown(record) {
     lines.push('## Blockers', '', ...(review.blockers.length ? review.blockers.map(item => `- ${item}`) : ['- None']), '');
   }
   if (decision) lines.push('## Decision', '', `- Decision: ${decision.decision}`, `- Reviewer: ${decision.reviewer}`, `- At: ${decision.at}`, `- Passed: ${decision.passed}`, ...(decision.notes ? [`- Notes: ${decision.notes}`] : []), '');
+  if (artifact?.email_draft) lines.push('## Clarification email draft (not sent)', '', artifact.email_draft.subject, '', artifact.email_draft.body, '');
+  if (artifact?.delivery) lines.push('## Delivery', '', `Status: ${artifact.delivery.status}`, '');
   lines.push('## Source integrity', '', `- Source SHA-256: ${record.source_hash}`, `- Review SHA-256: ${record.review_digest}`, '- External writes performed: false');
   return lines.join('\n');
 }

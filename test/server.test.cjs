@@ -7,10 +7,10 @@ const os = require('node:os');
 const path = require('node:path');
 const { createApp } = require('../src/server');
 
-async function setup(t) {
+async function setup(t, options = {}) {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'fde-workflow-'));
   let extractorCalls = 0;
-  const app = createApp({ database: path.join(folder, 'test.sqlite'), extractor: async () => { extractorCalls++; throw new Error('Extractor should not be called'); } });
+  const app = createApp({portfolio: false, googleConfig: {configured:false}, database: path.join(folder, 'test.sqlite'), extractor: async () => { extractorCalls++; throw new Error('Extractor should not be called'); }, ...options });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const address = app.server.address();
   const base = `http://127.0.0.1:${address.port}`;
@@ -21,8 +21,9 @@ async function setup(t) {
 
 test('bootstrap identifies the configured OpenClaw ChatGPT OAuth route', async t => {
   const { bootstrap } = await setup(t);
-  assert.equal(bootstrap.model.provider, 'OpenClaw · ChatGPT OAuth');
-  assert.equal(bootstrap.model.name, 'openai/gpt-5.4-mini');
+  assert.equal(bootstrap.model.provider, 'OpenClaw / ChatGPT OAuth');
+  assert.equal(bootstrap.model.name, 'openai/gpt-5.6-sol');
+  assert.equal(bootstrap.model.thinking, 'low');
 });
 
 test('browser route serves the local application with security headers', async t => {
@@ -74,4 +75,52 @@ test('a saved review accepts only one final decision', async t => {
   const body = JSON.stringify({ decision: 'Reject', confirmEvidence: false });
   assert.equal((await fetch(`${base}/api/runs/${created.id}/decision`, { method: 'POST', headers, body })).status, 200);
   assert.equal((await fetch(`${base}/api/runs/${created.id}/decision`, { method: 'POST', headers, body })).status, 409);
+});
+
+test('partial review and draft refinement persist through HTTP with fresh consent', async t => {
+  let calls = 0;
+  const { base, csrf } = await setup(t, { draftRefiner: async () => { calls++; return { subject: 'Pergunta', body: 'Qual é o prazo?', status: 'draft', method: 'model', recipient: '' }; } });
+  const headers = { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf };
+  const post = (url, data) => fetch(`${base}${url}`, { method: 'POST', headers, body: JSON.stringify(data) });
+  const created = await (await post('/api/runs', { mode: 'fixture', fixture: 'full' })).json();
+  const response = await post(`/api/runs/${created.id}/decision`, { decision: 'Review tasks', confirmEvidence: true, approvedTaskKeys: [created.review.candidates[0].task_key], clarifications: [{ index: 0, comment: 'Qual é o prazo?' }] });
+  assert.equal(response.status, 200);
+  const saved = await response.json();
+  assert.equal(saved.artifact.tasks.length, 1);
+  assert.equal(saved.artifact.pending_tasks.length, 1);
+  assert.equal(saved.artifact.email_draft.method, 'template');
+  assert.equal((await post(`/api/runs/${created.id}/draft`, {})).status, 400);
+  assert.equal(calls, 0);
+  assert.equal((await post(`/api/runs/${created.id}/draft`, { processingPermission: true, usagePermission: true })).status, 200);
+  const reloaded = await fetch(`${base}/api/runs/${created.id}`).then(r => r.json());
+  assert.equal(reloaded.artifact.email_draft.method, 'model');
+  assert.equal(reloaded.artifact.tasks.length, 1);
+  assert.equal(calls, 1);
+});
+
+test('client brief intake needs no internal owners and approvals export only selected projects', async t => {
+  let calls = 0;
+  const quote = 'Acme client: We approve the website.';
+  const { base, csrf } = await setup(t, { briefExtractor: async () => {
+    calls++;
+    return { proposals: [{ name: 'Website', client: 'Acme', description: 'Website', deliverables: [{ text: 'Website', evidence: [{ line: 1, quote }] }], requirements: [], delivery_date: null, date_evidence: [], status: 'confirmed', evidence: [{ line: 1, quote }] }] };
+  } });
+  const headers = { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf };
+  const post = (url, data) => fetch(`${base}${url}`, { method: 'POST', headers, body: JSON.stringify(data) });
+  const data = { mode: 'brief', title: 'Website meeting', started_at: '2026-09-11T10:00:00+02:00', reviewer: 'Felipe', client: 'Acme', transcript: quote };
+  assert.equal((await post('/api/runs', data)).status, 400);
+  assert.equal(calls, 0);
+  const response = await post('/api/runs', { ...data, processingPermission: true, usagePermission: true });
+  assert.equal(response.status, 201);
+  const created = await response.json();
+  assert.equal(created.review.kind, 'client_briefs');
+  const decision = await post(`/api/runs/${created.id}/decision`, { decision: 'Approve projects', approvedProposalIds: [created.review.proposals[0].id], confirmEvidence: true });
+  assert.equal(decision.status, 200);
+  const saved = await decision.json();
+  assert.equal(saved.artifact.projects.length, 1);
+  assert.equal(saved.artifact.projects[0].delivery_date, null);
+  assert.equal(saved.artifact.tasks, undefined);
+  const md = await fetch(`${base}/api/runs/${created.id}/export?format=markdown`).then(r => r.text());
+  assert.match(md, /Delivery date: Unspecified/);
+  assert.equal((await post(`/api/runs/${created.id}/decision`, { decision: 'Reject' })).status, 409);
 });

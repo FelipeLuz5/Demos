@@ -13,12 +13,12 @@
         <span class="brand-mark">F</span>
         <div><strong>FDE</strong><small>Meeting Review</small></div>
       </div>
-      <button class="primary wide" id="new-run">+ New review</button>
+      <button class="primary wide" id="new-run" disabled>+ New review</button>
       <div class="sidebar-label">Recent reviews</div>
       <nav id="run-list" aria-label="Saved reviews"></nav>
       <div class="local-card">
         <span class="pulse"></span>
-        <div><strong>Local workspace</strong><small>Offline portfolio demo. Fictional scenarios; no external calls.</small></div>
+        <div><strong>Local workspace</strong><small>Reviews are saved on this PC. Extraction sends data to the model; Google delivery sends approved briefs when you choose.</small><a id="google-status" href="/google-setup.html">Google connection</a></div>
       </div>
     </aside>
 
@@ -26,7 +26,7 @@
       <header>
         <div>
           <span class="eyebrow">CONTROLLED WORKFLOW</span>
-          <h1 id="page-title">Meeting to project plan</h1>
+          <h1 id="page-title">Client meeting to project brief</h1>
         </div>
         <div class="header-status" id="model-status">Loading…</div>
       </header>
@@ -34,18 +34,18 @@
       <section id="welcome" class="welcome">
         <div class="hero">
           <span class="hero-kicker">Evidence before action</span>
-          <h2>Turn a transcript into an approved, traceable project plan.</h2>
-          <p>Extract commitments, verify every source quotation, resolve blockers, and record one explicit human decision. All results are saved locally.</p>
-          <button class="primary" id="hero-new">Start a review</button>
+          <h2>Turn a client meeting into a clear project brief.</h2>
+          <p>Review proposed deliverables, client requirements, and agreed delivery dates. Approve your projects, then send their briefs to Google Docs in Drive and their deadlines to Google Calendar. Reviews are saved locally.</p>
+          <button class="primary" id="hero-new" disabled>Start a review</button>
         </div>
         <div class="flow-card">
-          <div class="flow-step"><b>01</b><span><strong>Intake</strong><small>Transcript and approved context</small></span></div>
+          <div class="flow-step"><b>01</b><span><strong>Upload</strong><small>Client meeting transcript</small></span></div>
           <div class="flow-line"></div>
-          <div class="flow-step"><b>02</b><span><strong>Evidence review</strong><small>Commitments, exclusions, conflicts</small></span></div>
+          <div class="flow-step"><b>02</b><span><strong>Project proposals</strong><small>Deliverables, requirements, dates</small></span></div>
           <div class="flow-line"></div>
-          <div class="flow-step"><b>03</b><span><strong>Human decision</strong><small>Approve, reject, or clarify</small></span></div>
+          <div class="flow-step"><b>03</b><span><strong>Human decision</strong><small>Approve or discard proposals</small></span></div>
           <div class="flow-line"></div>
-          <div class="flow-step"><b>04</b><span><strong>Local plan</strong><small>Portable JSON and Markdown</small></span></div>
+          <div class="flow-step"><b>04</b><span><strong>Google delivery</strong><small>Drive folders, Docs and Calendar deadlines</small></span></div>
         </div>
       </section>
 
@@ -54,42 +54,60 @@
           <div><span class="eyebrow">NEW REVIEW</span><h2>Choose an input</h2></div>
           <button class="icon-button" id="close-intake" aria-label="Close">×</button>
         </div>
-        <div class="tabs" role="tablist">
-          <button class="tab active" data-tab="fixtures">Saved test scenarios</button>
-          <span>Live extraction excluded from this demo</span>
-        </div>
-        <form id="fixture-form" class="tab-panel">
-          <div id="fixture-options" class="fixture-grid"></div>
-          <button class="primary" type="submit">Build offline review</button>
+        <form id="demo-form" class="hidden">
+          <p class="notice muted">Fictional transcripts and saved extraction results. You perform the real validation, evidence review, approval and export. No account or AI call is needed.</p>
+          <label>Scenario<select id="demo-fixture" required></select></label>
+          <p id="demo-description" class="quiet-copy"></p>
+          <label>Your reviewer name<input id="demo-reviewer" maxlength="100" required placeholder="e.g. Alex"></label>
+          <button class="primary" type="submit">Build review</button>
         </form>
+        <details id="fathom-panel" class="review-details hidden">
+          <summary>Import from Fathom</summary>
+          <p>Connect once, then choose a recorded meeting to load its transcript for review.</p>
+          <form id="fathom-connect">
+            <label>Fathom API key<input id="fathom-key" type="password" autocomplete="off" required></label>
+            <p>Find API Access in <a href="https://fathom.video/customize" target="_blank" rel="noopener noreferrer">Fathom settings</a>. Your key is stored securely on this PC.</p>
+            <button type="submit" class="secondary">Connect Fathom</button>
+          </form>
+          <div id="fathom-status" class="notice muted" role="status" aria-live="polite">Open this section to check your connection.</div>
+          <div id="fathom-meetings" class="hidden">
+            <button id="fathom-reconnect" type="button" class="secondary">Change API key</button>
+            <button id="fathom-refresh" type="button" class="secondary">Refresh meetings</button>
+            <label>Meeting<select id="fathom-selection"><option value="">Choose a meeting</option></select></label>
+            <button id="fathom-more" type="button" class="secondary hidden">Load more meetings</button>
+            <button id="fathom-import" type="button" class="secondary" disabled>Use transcript</button>
+            <p>Import fills the form below. Extraction starts only when you approve it and select “Extract and build review”.</p>
+          </div>
+        </details>
         <form id="manual-form" class="tab-panel hidden">
+          <label>Upload transcript sample<input id="transcript-file" type="file" accept=".txt,.json"></label>
+          <p>Choose a saved Granola-style sample. Meeting details are filled from its header; check them below before extraction. Uploading reads the file locally.</p>
+          <div id="import-status" class="notice muted hidden" role="status" aria-live="polite"></div>
           <div class="form-grid">
             <label class="span-2">Meeting title<input name="title" maxlength="200" required placeholder="Weekly delivery review"></label>
             <label>Meeting start<input name="started_at" required placeholder="2026-09-11T10:00:00+02:00"></label>
-            <label>Reviewer<input name="reviewer" required value="Felipe"></label>
-            <label>Client<input name="client" required placeholder="Client name"></label>
-            <label>Approved project<input name="project" required placeholder="Project name"></label>
-            <label class="span-2">Project aliases<input name="aliases" placeholder="One per line or comma separated"></label>
-            <label class="span-2">Approved owners<textarea name="owners" rows="3" required placeholder="One owner per line"></textarea></label>
-            <label class="span-2">Approved project facts<textarea name="approved_facts" rows="3" placeholder="Context the extractor may use"></textarea></label>
+            <label>Reviewer<input name="reviewer" required placeholder="Your name"></label>
+            <label>Client (optional)<input name="client" placeholder="Extract from the meeting if omitted"></label>
             <label class="span-2">Transcript<textarea name="transcript" rows="11" maxlength="40000" required placeholder="One spoken turn per line, including the speaker name"></textarea></label>
           </div>
           <div class="consent-box">
             <strong>External model call</strong>
-            <p>The manual path sends this transcript and approved context through the local OpenClaw Codex runtime to OpenAI using your ChatGPT subscription.</p>
+            <p>Extraction sends this transcript and meeting details through the local OpenClaw Codex runtime to OpenAI using your ChatGPT subscription.</p>
             <label class="check"><input type="checkbox" name="processingPermission"> I confirm this transcript may be sent for extraction.</label>
             <label class="check"><input type="checkbox" name="usagePermission"> I approve use of my ChatGPT subscription allowance for this model call.</label>
           </div>
-          <div id="run-status" class="notice muted hidden" role="status" aria-live="polite"></div>
           <button class="primary" type="submit">Extract and build review</button>
         </form>
+        <div id="run-status" class="notice muted hidden" role="status" aria-live="polite"></div>
       </section>
 
       <section id="review" class="hidden"></section>
       <div id="toast" role="status" aria-live="polite"></div>
     </main>
   </div>
+  <script src="/transcript-import.js" defer></script>
   <script src="/consent.js" defer></script>
   <script src="/app.js" defer></script>
+  <script src="/fathom.js" defer></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-name: Verify demo
+name: Tests
 on: [push, pull_request]
 permissions:
   contents: read

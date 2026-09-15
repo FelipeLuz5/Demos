@@ -1,10 +1,11 @@
 {
   "name": "fde-meeting-review",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Local meeting transcript review and approval app",
+  "description": "Evidence-backed project briefs with human approval: offline portfolio and optional connected workflow",
   "scripts": {
     "start": "node src/server.js",
+    "start:connected": "node src/server.js --connected",
     "test": "node --test test/*.test.cjs"
   },
   "engines": {

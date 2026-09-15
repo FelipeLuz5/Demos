@@ -12,6 +12,19 @@ class RunStore {
       PRAGMA journal_mode = WAL;
       PRAGMA synchronous = FULL;
       PRAGMA foreign_keys = ON;
+      CREATE TABLE IF NOT EXISTS google_operations (
+        operation_key TEXT PRIMARY KEY, run_id TEXT NOT NULL, state TEXT NOT NULL,
+        value_json TEXT, updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS notion_client_routes (route_key TEXT PRIMARY KEY, value_json TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS notion_deliveries (
+        delivery_key TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL,
+        state TEXT NOT NULL,
+        page_id TEXT,
+        page_url TEXT,
+        updated_at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS runs (
         id TEXT PRIMARY KEY,
         created_at TEXT NOT NULL,
@@ -75,6 +88,64 @@ class RunStore {
 
   event(runId, type, detail) {
     this.insertEvent.run(runId, new Date().toISOString(), type, json(detail));
+  }
+
+  saveDraft(id, draft) {
+    const record = this.get(id);
+    if (!record?.artifact?.email_draft) throw new Error('No saved draft');
+    record.artifact.email_draft = draft;
+    this.db.prepare('UPDATE runs SET artifact_json = ?, updated_at = ? WHERE id = ?').run(json(record.artifact), new Date().toISOString(), id);
+    this.event(id, 'clarification.drafted', { method: draft.method, sent: false });
+    return this.get(id);
+  }
+
+  notionDelivery(key) { return this.db.prepare('SELECT * FROM notion_deliveries WHERE delivery_key = ?').get(key); }
+  getRoute(key) { const row = this.db.prepare('SELECT value_json FROM notion_client_routes WHERE route_key=?').get(key); return row ? JSON.parse(row.value_json) : null; }
+  saveRoute(key, value) { this.db.prepare('INSERT INTO notion_client_routes(route_key,value_json) VALUES (?,?) ON CONFLICT(route_key) DO UPDATE SET value_json=excluded.value_json').run(key,JSON.stringify(value)); }
+  claimNotion(key, runId) {
+    return this.db.prepare("INSERT OR IGNORE INTO notion_deliveries(delivery_key,run_id,state,updated_at) VALUES (?,?,'uncertain',?)").run(key, runId, new Date().toISOString()).changes === 1;
+  }
+  finishNotion(key, page) {
+    this.db.prepare("UPDATE notion_deliveries SET state='delivered',page_id=?,page_url=?,updated_at=? WHERE delivery_key=?").run(page.id, page.url, new Date().toISOString(), key);
+  }
+  releaseNotion(key) { this.db.prepare("DELETE FROM notion_deliveries WHERE delivery_key=? AND state='uncertain'").run(key); }
+  saveDelivery(id, delivery) {
+    const record = this.get(id);
+    record.artifact.delivery = delivery;
+    record.artifact.external_writes_performed = delivery.pages.length > 0 || delivery.structure_created ? true : delivery.status === 'uncertain' ? null : false;
+    record.artifact.local_only = delivery.pages.length === 0 && !delivery.structure_created && delivery.status !== 'uncertain';
+    this.db.prepare('UPDATE runs SET artifact_json=?,updated_at=? WHERE id=?').run(json(record.artifact), new Date().toISOString(), id);
+    this.event(id, 'notion.delivery', delivery);
+    return this.get(id);
+  }
+
+  googleOperation(key) {
+    const row = this.db.prepare('SELECT * FROM google_operations WHERE operation_key=?').get(key);
+    return row ? { ...row, value: parse(row.value_json) } : null;
+  }
+  claimGoogle(key, runId) {
+    return this.db.prepare("INSERT OR IGNORE INTO google_operations(operation_key,run_id,state,updated_at) VALUES (?,?,'uncertain',?)").run(key, runId, new Date().toISOString()).changes === 1;
+  }
+  finishGoogle(key, value) {
+    this.db.prepare("UPDATE google_operations SET state='delivered',value_json=?,updated_at=? WHERE operation_key=?").run(json(value), new Date().toISOString(), key);
+  }
+  releaseGoogle(key) { this.db.prepare("DELETE FROM google_operations WHERE operation_key=? AND state='uncertain'").run(key); }
+  beginGoogleDelivery(id, delivery) {
+    // Atomic compare-and-set also binds competing app processes before either can write externally.
+    const result = this.db.prepare("UPDATE runs SET artifact_json=json_set(artifact_json,'$.google_delivery',json(?),'$.external_writes_performed',json(CASE WHEN json_extract(artifact_json,'$.external_writes_performed')=1 THEN 'true' ELSE 'null' END),'$.local_only',json('false')),updated_at=? WHERE id=? AND json_type(artifact_json,'$.google_delivery') IS NULL").run(json(delivery), new Date().toISOString(), id);
+    const current = this.get(id)?.artifact?.google_delivery;
+    if (!current || current.root_folder_id !== delivery.root_folder_id || current.calendar_id !== delivery.calendar_id) throw new Error('Google destination changed. Restore the original connection to reconcile this delivery.');
+    if (result.changes) this.event(id, 'google.delivery.started', { root_folder_id: delivery.root_folder_id, calendar_id: delivery.calendar_id });
+  }
+  saveGoogleDelivery(id, delivery) {
+    const record = this.get(id);
+    record.artifact.google_delivery = delivery;
+    const priorWrites = record.artifact.external_writes_performed;
+    record.artifact.external_writes_performed = priorWrites === true || delivery.writes_performed || delivery.projects.some(p => p.document_url || p.folder_url) ? true : delivery.status === 'uncertain' || priorWrites === null ? null : false;
+    record.artifact.local_only = record.artifact.external_writes_performed === false;
+    this.db.prepare('UPDATE runs SET artifact_json=?,updated_at=? WHERE id=?').run(json(record.artifact), new Date().toISOString(), id);
+    this.event(id, 'google.delivery', delivery);
+    return this.get(id);
   }
 
   close() { this.db.close(); }

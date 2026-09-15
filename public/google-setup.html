@@ -1,0 +1,11 @@
+﻿<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Connect Google · FDE Meeting Review</title>
+<link rel="stylesheet" href="/google-setup.css"></head>
+<body><main><a href="/">← Back to transcript review</a><h1>Connect Google</h1>
+<p>Approved project briefs go to Google Docs in your FDE Drive folder. Agreed delivery dates go to a dedicated FDE Deliveries calendar.</p>
+<ol><li>In your Google Cloud project, enable the Drive, Docs and Calendar APIs. Configure the consent screen and create a <strong>Desktop app</strong> OAuth client.</li><li>Download the client JSON outside this repository, then run <code>setup-google.cmd</code> in the repository root. Enter the file path in that terminal.</li><li>Open the sign-in URL shown by setup and consent with the account you want to use.</li><li>Return to the terminal and confirm creation of your FDE folder and FDE Deliveries calendar.</li><li>Configure the extraction runtime described in <code>docs/CONNECTED.md</code>. Restart with <code>npm run start:connected</code>, enter that document's fictional transcript, permit extraction, inspect the evidence and approve the brief. Sending it to Google is a separate action.</li></ol>
+<p>Credentials are encrypted for your Windows account. Keep downloaded client files and tokens private. Full instructions and recovery steps are in <code>docs/CONNECTED.md</code>.</p>
+<p>Setup creates private destinations. Sharing with a company or client is a separate owner action.</p>
+</main></body></html>
+

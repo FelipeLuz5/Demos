@@ -1,0 +1,21 @@
+ 'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const {createApp} = require('../src/server');
+test('Fathom setup verifies before saving, hides key, imports selected transcript without extraction', async t => {
+  let saved = '', calls = 0, fail = false;
+  const client = {listMeetings: async () => {if(fail) throw new Error('Fathom authorization failed.'); return {items:[{recording_id:'123',title:'Meeting',started_at:'2026-09-14T09:00:00Z'}],next_cursor:null};},transcript:async(id,m)=>({...m,transcript:'Felipe: Agreed.'})};
+  const fathom = {fathomConfig:()=>({configured:!!saved,apiKey:saved}),saveFathomKey:k=>{saved=k;},createFathomClient:()=>client};
+  const app=createApp({portfolio: false,database:':memory:',googleConfig:{configured:false},fathom,briefExtractor:async()=>{calls++;throw new Error('unexpected');}});
+  await new Promise(r=>app.server.listen(0,'127.0.0.1',r)); t.after(()=>app.close());
+  const base=`http://127.0.0.1:${app.server.address().port}`;
+  const post=(route,data,token=app.csrf)=>fetch(base+route,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':token},body:JSON.stringify(data)});
+  assert.equal((await post('/api/fathom/connect',{apiKey:'private'},'bad')).status,403);
+  fail=true; assert.equal((await post('/api/fathom/connect',{apiKey:'private'})).status,400); assert.equal(saved,'');
+  fail=false; assert.equal((await post('/api/fathom/connect',{apiKey:'private'})).status,200);
+  assert.deepEqual(await (await fetch(base+'/api/fathom/status')).json(),{configured:true});
+  assert.equal((await post('/api/fathom/import',{id:'123'})).status,400);
+  const listed=await (await post('/api/fathom/meetings',{})).json(); assert.equal(listed.meetings[0].id,'123');
+  const imported=await (await post('/api/fathom/import',{id:'123'})).json(); assert.equal(imported.transcript,'Felipe: Agreed.'); assert.equal(imported.title,'Meeting');
+  assert.equal(calls,0); assert.deepEqual(app.store.list(),[]);
+});
