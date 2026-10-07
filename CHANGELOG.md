@@ -1,5 +1,10 @@
 # Changelog
 
+## Portfolio update — 7 October 2026
+
+- Turned the README into a portfolio overview: FDE Meeting Review remains the runnable project; added descriptions of other recent work whose repositories stay private.
+- No application code changed; FDE Meeting Review is still version 2.0.0.
+
 ## 2.0.0 — 15 September 2026
 
 - Updated the main experience from task commitments to client project briefs: deliverables, requirements and agreed dates.
